@@ -1,0 +1,59 @@
+name: Test match pattern for tag filtering
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install gh CLI
+        run: |
+          if ! command -v gh &>/dev/null; then
+            type -p curl >/dev/null || (apt-get update && apt-get install -y curl)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt-get update
+            apt-get install -y gh
+          fi
+          gh --version
+      - id: action
+        uses: .
+        with:
+          token: ${{ github.token }}
+          repo: proudust/gh-describe
+          commit-ish: v2.1.2
+          match: "v*"
+      - name: Assert tag matches v* pattern
+        env:
+          TAG: ${{ steps.action.outputs.tag }}
+        run: |
+          echo "tag: $TAG"
+          if [ -z "$TAG" ]; then
+            echo "FAIL: expected tag to be non-empty"
+            exit 1
+          fi
+          if ! echo "$TAG" | grep -qE '^v'; then
+            echo "FAIL: expected tag to start with 'v', got: $TAG"
+            exit 1
+          fi
+          echo "PASS: tag '$TAG' matches v* pattern"
+      - name: Assert describe output starts with matched tag
+        env:
+          DESCRIBE: ${{ steps.action.outputs.describe }}
+          TAG: ${{ steps.action.outputs.tag }}
+        run: |
+          echo "describe: $DESCRIBE"
+          echo "tag: $TAG"
+          if [ -z "$DESCRIBE" ]; then
+            echo "FAIL: expected describe to be non-empty"
+            exit 1
+          fi
+          if ! echo "$DESCRIBE" | grep -q "^$TAG"; then
+            echo "FAIL: expected describe '$DESCRIBE' to start with tag '$TAG'"
+            exit 1
+          fi
+          echo "PASS: describe '$DESCRIBE' starts with tag '$TAG'"

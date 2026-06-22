@@ -1,0 +1,94 @@
+name: Test basic usage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install gh CLI
+        run: |
+          if ! command -v gh &>/dev/null; then
+            type -p curl >/dev/null || (apt-get update && apt-get install -y curl)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt-get update
+            apt-get install -y gh
+          fi
+          gh --version
+      - id: action
+        uses: .
+        with:
+          token: ${{ github.token }}
+          repo: proudust/gh-describe
+          commit-ish: v2.1.2
+      - name: Assert sha output is non-empty
+        env:
+          SHA: ${{ steps.action.outputs.sha }}
+        run: |
+          echo "sha: $SHA"
+          if [ -z "$SHA" ]; then
+            echo "FAIL: expected sha to be non-empty"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert short-sha output is non-empty
+        env:
+          SHORT_SHA: ${{ steps.action.outputs.short-sha }}
+        run: |
+          echo "short-sha: $SHORT_SHA"
+          if [ -z "$SHORT_SHA" ]; then
+            echo "FAIL: expected short-sha to be non-empty"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert tag output is non-empty
+        env:
+          TAG: ${{ steps.action.outputs.tag }}
+        run: |
+          echo "tag: $TAG"
+          if [ -z "$TAG" ]; then
+            echo "FAIL: expected tag to be non-empty"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert describe output is non-empty
+        env:
+          DESCRIBE: ${{ steps.action.outputs.describe }}
+        run: |
+          echo "describe: $DESCRIBE"
+          if [ -z "$DESCRIBE" ]; then
+            echo "FAIL: expected describe to be non-empty"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert distance output is a number
+        env:
+          DISTANCE: ${{ steps.action.outputs.distance }}
+        run: |
+          echo "distance: $DISTANCE"
+          if ! echo "$DISTANCE" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected distance to be a non-negative integer, got: $DISTANCE"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert tag equals v2.1.2 (exact tag commit)
+        env:
+          TAG: ${{ steps.action.outputs.tag }}
+          DISTANCE: ${{ steps.action.outputs.distance }}
+        run: |
+          echo "tag: $TAG"
+          echo "distance: $DISTANCE"
+          if [ "$TAG" != "v2.1.2" ]; then
+            echo "FAIL: expected tag to be 'v2.1.2', got: $TAG"
+            exit 1
+          fi
+          if [ "$DISTANCE" != "0" ]; then
+            echo "FAIL: expected distance to be '0' for exact tag commit, got: $DISTANCE"
+            exit 1
+          fi
+          echo "PASS"

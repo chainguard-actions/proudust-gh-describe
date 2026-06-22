@@ -1,0 +1,42 @@
+name: Test default value when no tag found
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install gh CLI
+        run: |
+          if ! command -v gh &>/dev/null; then
+            type -p curl >/dev/null || (apt-get update && apt-get install -y curl)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt-get update
+            apt-get install -y gh
+          fi
+          gh --version
+      - id: action
+        uses: .
+        with:
+          token: ${{ github.token }}
+          repo: proudust/gh-describe
+          # Use a commit SHA that has no tags before it (first commit in the repo)
+          # The action should fall back to the default value
+          commit-ish: v2.1.2
+          match: "nonexistent-pattern-xyz-*"
+          default: "no-tag-found"
+      - name: Assert default value is returned when no matching tag found
+        env:
+          DESCRIBE: ${{ steps.action.outputs.describe }}
+        run: |
+          echo "describe: $DESCRIBE"
+          if [ "$DESCRIBE" != "no-tag-found" ]; then
+            echo "FAIL: expected describe to be 'no-tag-found', got: $DESCRIBE"
+            exit 1
+          fi
+          echo "PASS: default value 'no-tag-found' was returned"
