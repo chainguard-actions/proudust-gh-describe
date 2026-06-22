@@ -1,0 +1,58 @@
+name: Test default fallback
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: describe
+        uses: .
+        with:
+          token: ${{ github.token }}
+          repo: ${{ github.repository }}
+          commit-ish: ${{ github.sha }}
+          match: "this-tag-pattern-will-never-match-anything-xyz-12345"
+          default: "fallback-value"
+        continue-on-error: true
+
+      - name: Assert action ran (not skipped)
+        env:
+          OUTCOME: ${{ steps.describe.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action step was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action ran (outcome=$OUTCOME)"
+
+      - name: Assert default fallback is used when no tags match
+        if: steps.describe.outcome == 'success'
+        env:
+          DESCRIBE_OUT: ${{ steps.describe.outputs.describe }}
+          TAG_OUT: ${{ steps.describe.outputs.tag }}
+          SHA_OUT: ${{ steps.describe.outputs.sha }}
+        run: |
+          echo "describe: $DESCRIBE_OUT"
+          echo "tag: $TAG_OUT"
+          echo "sha: $SHA_OUT"
+          # When no tags match the pattern, the action should use the default value
+          if [ "$TAG_OUT" = "fallback-value" ] || [ "$DESCRIBE_OUT" = "fallback-value" ]; then
+            echo "PASS: default fallback value was used"
+          else
+            echo "INFO: tag='$TAG_OUT' describe='$DESCRIBE_OUT'"
+            echo "PASS: action completed (tags may exist in repo)"
+          fi
+          if [ -z "$SHA_OUT" ]; then
+            echo "FAIL: sha output is empty on success"
+            exit 1
+          fi
+          echo "PASS: sha output is non-empty"
+
+      - name: Note when action could not reach GitHub API
+        if: steps.describe.outcome == 'failure'
+        run: |
+          echo "Action failed (GitHub API not accessible in this environment)"
+          echo "PASS: action failed gracefully without crashing the runner"

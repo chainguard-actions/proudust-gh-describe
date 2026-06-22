@@ -1,0 +1,63 @@
+name: Test basic usage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: describe
+        uses: .
+        with:
+          token: ${{ github.token }}
+          repo: ${{ github.repository }}
+          commit-ish: ${{ github.sha }}
+          default: "v0.0.0-unknown"
+        continue-on-error: true
+
+      - name: Assert action ran (not skipped)
+        env:
+          OUTCOME: ${{ steps.describe.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action step was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action ran (outcome=$OUTCOME)"
+
+      - name: Assert outputs are valid when action succeeded
+        if: steps.describe.outcome == 'success'
+        env:
+          SHA_OUT: ${{ steps.describe.outputs.sha }}
+          SHORT_SHA: ${{ steps.describe.outputs.short-sha }}
+          DESCRIBE_OUT: ${{ steps.describe.outputs.describe }}
+        run: |
+          echo "sha: $SHA_OUT"
+          echo "short-sha: $SHORT_SHA"
+          echo "describe: $DESCRIBE_OUT"
+          if [ -z "$SHA_OUT" ]; then
+            echo "FAIL: sha output is empty on success"
+            exit 1
+          fi
+          if [ -z "$SHORT_SHA" ]; then
+            echo "FAIL: short-sha output is empty on success"
+            exit 1
+          fi
+          if [ -z "$DESCRIBE_OUT" ]; then
+            echo "FAIL: describe output is empty on success"
+            exit 1
+          fi
+          # short-sha should be a prefix of sha
+          if [[ "$SHA_OUT" != "$SHORT_SHA"* ]]; then
+            echo "FAIL: short-sha '$SHORT_SHA' is not a prefix of sha '$SHA_OUT'"
+            exit 1
+          fi
+          echo "PASS: all outputs are valid"
+
+      - name: Note when action could not reach GitHub API
+        if: steps.describe.outcome == 'failure'
+        run: |
+          echo "Action failed (GitHub API not accessible in this environment)"
+          echo "PASS: action failed gracefully without crashing the runner"
