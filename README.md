@@ -9,6 +9,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
 | v2.1.1 | [`v2.1.1`](https://github.com/chainguard-actions/proudust-gh-describe/tree/v2.1.1) | [`d7279b4`](https://github.com/proudust/gh-describe/commit/d7279b40f5aa4868ba0be464c4789cbee41fb279) |
+| v2.1.2 | [`v2.1.2`](https://github.com/chainguard-actions/proudust-gh-describe/tree/v2.1.2) | [`d239881`](https://github.com/proudust/gh-describe/commit/d2398810d922ababf1ec0efb454e42953dfdc460) |
 
 ## Privacy
 
