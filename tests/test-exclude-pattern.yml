@@ -1,0 +1,60 @@
+name: Test exclude pattern
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock gh CLI
+        run: |
+          mkdir -p /tmp/mock-bin
+          cat > /tmp/mock-bin/gh << 'MOCKEOF'
+          #!/bin/sh
+          ARGS="$*"
+          if echo "$ARGS" | grep -q "graphql"; then
+            echo '{"data":{"repository":{"object":{"history":{"totalCount":1}}}}}'
+          elif echo "$ARGS" | grep -qE "repos/[^/?]+/[^/?]+/tags"; then
+            echo '["abc1234567890123456789012345678901234567890","v2.1.0"]'
+          elif echo "$ARGS" | grep -qE "repos/[^/?]+/[^/?]+/commits"; then
+            echo "abc1234567890123456789012345678901234567890"
+          else
+            echo "mock gh: unhandled args: $ARGS" >&2
+            exit 1
+          fi
+          MOCKEOF
+          chmod +x /tmp/mock-bin/gh
+          cp /tmp/mock-bin/gh /usr/local/bin/gh
+          echo "/tmp/mock-bin" >> "$GITHUB_PATH"
+
+      - id: describe
+        uses: .
+        with:
+          token: fake-token-for-testing
+          repo: proudust/gh-describe
+          commit-ish: refs/heads/main
+          exclude: "*"
+          default: "no-tag-found"
+
+      - name: Assert describe uses default when all tags excluded
+        env:
+          DESCRIBE: ${{ steps.describe.outputs.describe }}
+        run: |
+          echo "describe: $DESCRIBE"
+          if [ "$DESCRIBE" != "no-tag-found" ]; then
+            echo "FAIL: expected describe to be 'no-tag-found', got '$DESCRIBE'"
+            exit 1
+          fi
+          echo "PASS: describe uses default when all tags excluded"
+
+      - name: Assert sha output is still populated
+        env:
+          SHA: ${{ steps.describe.outputs.sha }}
+        run: |
+          echo "sha: $SHA"
+          if [ -z "$SHA" ]; then
+            echo "FAIL: sha output is empty"
+            exit 1
+          fi
+          echo "PASS: sha is non-empty"
