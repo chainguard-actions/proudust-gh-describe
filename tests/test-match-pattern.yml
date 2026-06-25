@@ -1,0 +1,62 @@
+name: Test match pattern for tag filtering
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install gh CLI
+        run: |
+          type gh && echo "gh already installed" && exit 0
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update -q
+          sudo apt-get install -y gh
+      - id: action
+        uses: .
+        with:
+          repo: proudust/gh-describe
+          commit-ish: v2.2.0
+          token: ${{ github.token }}
+          match: "v*"
+          default: "v0.0.0-fallback"
+      - name: Assert tag matches v* pattern
+        env:
+          TAG: ${{ steps.action.outputs.tag }}
+          DESCRIBE: ${{ steps.action.outputs.describe }}
+          SHA: ${{ steps.action.outputs.sha }}
+          DISTANCE: ${{ steps.action.outputs.distance }}
+        run: |
+          echo "describe:  $DESCRIBE"
+          echo "tag:       $TAG"
+          echo "sha:       $SHA"
+          echo "distance:  $DISTANCE"
+          if [ -z "$TAG" ]; then
+            echo "FAIL: expected tag to be non-empty when matching v* pattern"
+            exit 1
+          fi
+          if [[ "$TAG" != v* ]]; then
+            echo "FAIL: expected tag '$TAG' to start with 'v'"
+            exit 1
+          fi
+          echo "PASS: tag '$TAG' matches v* pattern"
+      - name: Assert distance output is a number when present
+        env:
+          DISTANCE: ${{ steps.action.outputs.distance }}
+        run: |
+          echo "distance: $DISTANCE"
+          if [ -z "$DISTANCE" ]; then
+            echo "INFO: distance is empty (commit may be exactly on a tag)"
+            echo "PASS"
+          else
+            if ! echo "$DISTANCE" | grep -qE '^[0-9]+$'; then
+              echo "FAIL: expected distance '$DISTANCE' to be a non-negative integer"
+              exit 1
+            fi
+            echo "PASS: distance '$DISTANCE' is a valid number"
+          fi
