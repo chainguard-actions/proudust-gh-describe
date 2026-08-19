@@ -1,0 +1,234 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+
+permissions: {}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name != github.repository
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 20
+
+      - name: Use Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
+        with:
+          deno-version: v1.x
+
+      - name: Lint and Test
+        run: deno task test
+
+      - name: Build
+        run: deno task build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Verify No Unstaged Changes
+        run: |
+          if [[ "$(git status --porcelain)" != "" ]]; then
+            echo git status
+            git status
+            echo git diff
+            git diff
+            echo "::error::Unstaged changes detected."
+            exit 1
+          fi
+
+  compile:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name != github.repository
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 20
+
+      - name: Use Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
+        with:
+          deno-version: v2.x
+
+      - name: Build
+        run: deno task compile
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gh-describe-canary
+          path: ./dist/gh-describe-*
+
+  test:
+    strategy:
+      matrix:
+        deno-version: [v1.x, v2.x]
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    if: >
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name != github.repository
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 20
+
+      - name: Use Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
+        with:
+          deno-version: ${{ matrix.deno-version }}
+
+      - name: Install on GitHub CLI Extensions
+        run: gh extensions install .
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Test Run on GitHub CLI Extensions with Deno
+        run: |
+          gh describe --runtime deno --version
+          gh describe --runtime deno
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Test Run on GitHub CLI Extensions with Node.js
+        run: |
+          gh describe --runtime node --version
+          gh describe --runtime node
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Test Run on Deno Run
+        shell: bash
+        run: |
+          deno run --allow-run https://raw.githubusercontent.com/proudust/gh-describe/"${GITHUB_SHA}"/main.ts --version
+          deno run --allow-run https://raw.githubusercontent.com/proudust/gh-describe/"${GITHUB_SHA}"/main.ts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Test Run on GitHub Actions
+        id: ghd
+        uses: ./
+
+      - name: Check outputs
+        env:
+          GHD_DESCRIBE: ${{ steps.ghd.outputs.describe }}
+          GHD_TAG: ${{ steps.ghd.outputs.tag }}
+          GHD_DISTANCE: ${{ steps.ghd.outputs.distance }}
+          GHD_SHA: ${{ steps.ghd.outputs.sha }}
+          GHD_SHORT_SHA: ${{ steps.ghd.outputs.short-sha }}
+        run: |
+          echo "describe  : $GHD_DESCRIBE"
+          echo "tag       : $GHD_TAG"
+          echo "distance  : $GHD_DISTANCE"
+          echo "sha       : $GHD_SHA"
+          echo "short-sha : $GHD_SHORT_SHA"
+
+      # Tests for Action inputs using proudust/gh-describe-sample
+      # Repo structure:
+      #   Commit 4: master, v1.0.2-nightly
+      #   Commit 3: v1.0.1-beta
+      #   Commit 2:
+      #   Commit 1: v1, v1.0.0
+
+      # Test corresponding to the README inputs example (all 6 inputs)
+      - name: Test with all inputs (README example)
+        id: ghd_with_all_inputs
+        uses: ./
+        with:
+          token: ${{ github.token }}
+          repo: proudust/gh-describe-sample
+          commit-ish: master
+          match: "v*.*.*"
+          exclude: "*-beta,*-nightly"
+          default: "v0.0.0"
+
+      - name: Check all-inputs outputs
+        shell: bash
+        env:
+          GHD_ALL_DESCRIBE: ${{ steps.ghd_with_all_inputs.outputs.describe }}
+          GHD_ALL_TAG: ${{ steps.ghd_with_all_inputs.outputs.tag }}
+          GHD_ALL_DISTANCE: ${{ steps.ghd_with_all_inputs.outputs.distance }}
+          GHD_ALL_SHA: ${{ steps.ghd_with_all_inputs.outputs.sha }}
+          GHD_ALL_SHORT_SHA: ${{ steps.ghd_with_all_inputs.outputs.short-sha }}
+        run: |
+          echo "describe  : $GHD_ALL_DESCRIBE"
+          echo "tag       : $GHD_ALL_TAG"
+          echo "distance  : $GHD_ALL_DISTANCE"
+          echo "sha       : $GHD_ALL_SHA"
+          echo "short-sha : $GHD_ALL_SHORT_SHA"
+          [[ "$GHD_ALL_TAG" == "v1.0.0" ]] || { echo "::error::Expected tag=v1.0.0, got $GHD_ALL_TAG"; exit 1; }
+          [[ "$GHD_ALL_DISTANCE" == "3" ]] || { echo "::error::Expected distance=3, got $GHD_ALL_DISTANCE"; exit 1; }
+
+  release:
+    runs-on: ubuntu-latest
+    if: >
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event_name == 'release'
+    needs:
+      - build
+      - compile
+      - test
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Restore
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: gh-describe-canary
+          path: ./dist
+
+      - name: Run gh-describe
+        id: ghd
+        uses: ./
+
+      - name: Create Release and Upload Files
+        run: |
+          if gh release view "${GITHUB_RELEASE_TAG}" --json tagName >/dev/null && echo 'release found'; then
+            gh release upload --clobber "${GITHUB_RELEASE_TAG}" ./dist/gh-describe-*
+          else
+            gh release create -d --generate-notes "${GITHUB_RELEASE_TAG}" ./dist/gh-describe-*
+          fi
+        env:
+          GITHUB_RELEASE_TAG: ${{ steps.ghd.outputs.tag }}
+          GITHUB_TOKEN: ${{ github.token }}

@@ -4,59 +4,87 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Install gh CLI
+        with:
+          fetch-depth: 0
+
+      - name: Ensure gh CLI is available
         run: |
-          type gh && echo "gh already installed" && exit 0
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt-get update -q
-          sudo apt-get install -y gh
-      - id: action
+          if ! command -v gh &>/dev/null; then
+            apt-get update -qq && apt-get install -y -qq gh
+          fi
+          gh --version
+
+      - id: describe
         uses: .
         with:
+          token: ${{ github.token }}
           repo: proudust/gh-describe
           commit-ish: v2.2.0
-          token: ${{ github.token }}
-          default: "v2.2.0-fallback"
-      - name: Assert describe output is populated
+
+      - name: Assert sha output is non-empty
         env:
-          DESCRIBE: ${{ steps.action.outputs.describe }}
+          ACTUAL: ${{ steps.describe.outputs.sha }}
         run: |
-          echo "describe: $DESCRIBE"
-          if [ -z "$DESCRIBE" ]; then
-            echo "FAIL: expected describe to be non-empty"
-            exit 1
-          fi
-          echo "PASS: describe is populated: $DESCRIBE"
-      - name: Assert tag output is populated
-        env:
-          TAG: ${{ steps.action.outputs.tag }}
-        run: |
-          echo "tag: $TAG"
-          if [ -z "$TAG" ]; then
-            echo "FAIL: expected tag to be non-empty"
-            exit 1
-          fi
-          echo "PASS: tag is populated: $TAG"
-      - name: Assert sha output is populated
-        env:
-          SHA: ${{ steps.action.outputs.sha }}
-          SHORT_SHA: ${{ steps.action.outputs.short-sha }}
-        run: |
-          echo "sha:       $SHA"
-          echo "short-sha: $SHORT_SHA"
-          if [ -z "$SHA" ]; then
+          echo "sha: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
             echo "FAIL: expected sha to be non-empty"
             exit 1
           fi
-          if [ -z "$SHORT_SHA" ]; then
+          echo "PASS"
+
+      - name: Assert short-sha output is non-empty
+        env:
+          ACTUAL: ${{ steps.describe.outputs.short-sha }}
+        run: |
+          echo "short-sha: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
             echo "FAIL: expected short-sha to be non-empty"
             exit 1
           fi
-          echo "PASS: sha and short-sha are populated"
+          echo "PASS"
+
+      - name: Assert describe output is non-empty
+        env:
+          ACTUAL: ${{ steps.describe.outputs.describe }}
+        run: |
+          echo "describe: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected describe to be non-empty"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert tag output is non-empty
+        env:
+          ACTUAL: ${{ steps.describe.outputs.tag }}
+        run: |
+          echo "tag: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected tag to be non-empty"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert distance output is a number
+        env:
+          ACTUAL: ${{ steps.describe.outputs.distance }}
+        run: |
+          echo "distance: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected distance to be a non-negative integer, got: $ACTUAL"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert tag is v2.2.0
+        env:
+          ACTUAL: ${{ steps.describe.outputs.tag }}
+        run: |
+          echo "tag: $ACTUAL"
+          if [ "$ACTUAL" != "v2.2.0" ]; then
+            echo "FAIL: expected tag to be 'v2.2.0' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"

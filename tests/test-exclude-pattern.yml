@@ -1,4 +1,4 @@
-name: Test default value fallback
+name: Test exclude pattern filtering
 on:
   workflow_dispatch:
 jobs:
@@ -16,22 +16,22 @@ jobs:
           fi
           gh --version
 
-      - id: describe
+      - id: describe-excluded
         uses: .
         with:
           token: ${{ github.token }}
           repo: proudust/gh-describe
           commit-ish: v2.2.0
-          match: "nonexistent-prefix-xyzzy-*"
-          default: "fallback-value"
+          exclude: "v*"
+          default: "all-tags-excluded"
 
-      - name: Assert describe output falls back to default
+      - name: Assert describe falls back to default when all tags are excluded
         env:
-          ACTUAL: ${{ steps.describe.outputs.describe }}
+          ACTUAL: ${{ steps.describe-excluded.outputs.describe }}
         run: |
           echo "describe: $ACTUAL"
-          if [ "$ACTUAL" != "fallback-value" ]; then
-            echo "FAIL: expected 'fallback-value' but got '$ACTUAL'"
+          if [ "$ACTUAL" != "all-tags-excluded" ]; then
+            echo "FAIL: expected 'all-tags-excluded' but got '$ACTUAL'"
             exit 1
           fi
           echo "PASS"
