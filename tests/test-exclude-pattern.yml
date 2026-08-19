@@ -7,67 +7,50 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Install gh CLI if not present
+        run: |
+          if ! command -v gh &>/dev/null; then
+            type -p curl >/dev/null || (apt-get update && apt-get install -y curl)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+              dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+              tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt-get update && apt-get install -y gh
+          fi
+          gh --version
+
       - id: describe
         uses: .
         with:
           token: ${{ github.token }}
-          repo: ${{ github.repository }}
-          commit-ish: ${{ github.sha }}
-          exclude: "this-pattern-excludes-nothing-xyz-99999"
+          repo: proudust/gh-describe
+          commit-ish: v2.1.1
+          exclude: "*"
           default: "no-tag-found"
-        continue-on-error: true
-
-      - name: Assert action ran (not skipped)
         env:
-          OUTCOME: ${{ steps.describe.outcome }}
-        run: |
-          echo "outcome: $OUTCOME"
-          if [ "$OUTCOME" = "skipped" ]; then
-            echo "FAIL: action step was skipped unexpectedly"
-            exit 1
-          fi
-          echo "PASS: action ran (outcome=$OUTCOME)"
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Assert outputs are valid when action succeeded
-        if: steps.describe.outcome == 'success'
+      - name: Assert describe output uses default when all tags are excluded
         env:
-          SHA_OUT: ${{ steps.describe.outputs.sha }}
-          SHORT_SHA: ${{ steps.describe.outputs.short-sha }}
-          DESCRIBE_OUT: ${{ steps.describe.outputs.describe }}
-          TAG_OUT: ${{ steps.describe.outputs.tag }}
-          DISTANCE_OUT: ${{ steps.describe.outputs.distance }}
+          DESCRIBE: ${{ steps.describe.outputs.describe }}
         run: |
-          echo "sha: $SHA_OUT"
-          echo "short-sha: $SHORT_SHA"
-          echo "describe: $DESCRIBE_OUT"
-          echo "tag: $TAG_OUT"
-          echo "distance: $DISTANCE_OUT"
-          if [ -z "$SHA_OUT" ]; then
-            echo "FAIL: sha output is empty on success"
+          echo "describe: $DESCRIBE"
+          # When all tags are excluded, the action should use the default value
+          if [ "$DESCRIBE" != "no-tag-found" ]; then
+            echo "FAIL: expected 'no-tag-found' but got '$DESCRIBE'"
             exit 1
           fi
-          if [ -z "$SHORT_SHA" ]; then
-            echo "FAIL: short-sha output is empty on success"
-            exit 1
-          fi
-          if [ -z "$DESCRIBE_OUT" ]; then
-            echo "FAIL: describe output is empty on success"
-            exit 1
-          fi
-          # If a tag was found, describe should start with the tag
-          if [ -n "$TAG_OUT" ] && [ "$TAG_OUT" != "no-tag-found" ]; then
-            if [[ "$DESCRIBE_OUT" != "$TAG_OUT"* ]]; then
-              echo "FAIL: describe '$DESCRIBE_OUT' does not start with tag '$TAG_OUT'"
-              exit 1
-            fi
-            echo "PASS: describe output starts with tag"
-          else
-            echo "No matching tag found, default was used"
-            echo "PASS: default behavior applied"
-          fi
+          echo "PASS: describe output is the default value when all tags excluded"
 
-      - name: Note when action could not reach GitHub API
-        if: steps.describe.outcome == 'failure'
+      - name: Assert sha is still populated even when tags are excluded
+        env:
+          SHA: ${{ steps.describe.outputs.sha }}
         run: |
-          echo "Action failed (GitHub API not accessible in this environment)"
-          echo "PASS: action failed gracefully without crashing the runner"
+          echo "sha: $SHA"
+          if [ -z "$SHA" ]; then
+            echo "FAIL: sha output is empty"
+            exit 1
+          fi
+          echo "PASS: sha is populated"

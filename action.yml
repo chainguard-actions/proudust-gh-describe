@@ -1,6 +1,7 @@
 name: gh-describe
 description: "Emulate `git describe --tags` for shallow clone repositories."
 author: Proudust
+
 inputs:
   token:
     description: Personal Access Token (PAT)
@@ -10,8 +11,8 @@ inputs:
     default: ${{ github.repository }}
   commit-ish:
     description: >
-      Commit-ish object names to describe. The commit sha that triggered the workflow run.
-
+      Commit-ish object names to describe.
+      The commit sha that triggered the workflow run.
     default: ${{ github.sha }}
   match:
     description: Only consider tags matching the given glob pattern.
@@ -22,31 +23,34 @@ inputs:
   default:
     description: If the name is not found, use this value.
     default: ""
+
 outputs:
   describe:
     description: >
-      `git describe --tags`-like description. ex) v1.0.4-14-g2414721
-
+      `git describe --tags`-like description.
+      ex) v1.0.4-14-g2414721
   tag:
     description: >
-      The most recent tag. ex) v1.0.4
-
+      The most recent tag.
+      ex) v1.0.4
   distance:
     description: >
-      The number of additional commits from the most recent tag. ex) 14
-
+      The number of additional commits from the most recent tag.
+      ex) 14
   sha:
     description: >
-      The object name for the commit itself. ex) 2414721230345897234093645897124245324623
-
+      The object name for the commit itself.
+      ex) 2414721230345897234093645897124245324623
   short-sha:
     description: >
-      The object name for the commit itself. ex) 2414721
+      The object name for the commit itself.
+      ex) 2414721
 
 runs:
+  pre: chainguard-phonehome.js
   using: node20
   main: dist/actions.js
-  pre: chainguard-phonehome.js
+
 branding:
   icon: tag
   color: gray-dark

@@ -7,52 +7,61 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Install gh CLI if not present
+        run: |
+          if ! command -v gh &>/dev/null; then
+            type -p curl >/dev/null || (apt-get update && apt-get install -y curl)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+              dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+              tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt-get update && apt-get install -y gh
+          fi
+          gh --version
+
       - id: describe
         uses: .
         with:
           token: ${{ github.token }}
-          repo: ${{ github.repository }}
-          commit-ish: ${{ github.sha }}
-          match: "this-tag-pattern-will-never-match-anything-xyz-12345"
+          repo: proudust/gh-describe
+          commit-ish: v2.1.1
+          match: "this-pattern-will-never-match-any-tag-xyz123"
           default: "fallback-value"
-        continue-on-error: true
-
-      - name: Assert action ran (not skipped)
         env:
-          OUTCOME: ${{ steps.describe.outcome }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Assert describe output uses default when no tag matches
+        env:
+          DESCRIBE: ${{ steps.describe.outputs.describe }}
         run: |
-          echo "outcome: $OUTCOME"
-          if [ "$OUTCOME" = "skipped" ]; then
-            echo "FAIL: action step was skipped unexpectedly"
+          echo "describe: $DESCRIBE"
+          # When no tag matches the pattern, the action should use the default value
+          if [ "$DESCRIBE" != "fallback-value" ]; then
+            echo "FAIL: expected 'fallback-value' but got '$DESCRIBE'"
             exit 1
           fi
-          echo "PASS: action ran (outcome=$OUTCOME)"
+          echo "PASS: describe output is the default fallback value"
 
-      - name: Assert default fallback is used when no tags match
-        if: steps.describe.outcome == 'success'
+      - name: Assert tag output uses default when no tag matches
         env:
-          DESCRIBE_OUT: ${{ steps.describe.outputs.describe }}
-          TAG_OUT: ${{ steps.describe.outputs.tag }}
-          SHA_OUT: ${{ steps.describe.outputs.sha }}
+          TAG: ${{ steps.describe.outputs.tag }}
         run: |
-          echo "describe: $DESCRIBE_OUT"
-          echo "tag: $TAG_OUT"
-          echo "sha: $SHA_OUT"
-          # When no tags match the pattern, the action should use the default value
-          if [ "$TAG_OUT" = "fallback-value" ] || [ "$DESCRIBE_OUT" = "fallback-value" ]; then
-            echo "PASS: default fallback value was used"
-          else
-            echo "INFO: tag='$TAG_OUT' describe='$DESCRIBE_OUT'"
-            echo "PASS: action completed (tags may exist in repo)"
-          fi
-          if [ -z "$SHA_OUT" ]; then
-            echo "FAIL: sha output is empty on success"
+          echo "tag: $TAG"
+          if [ "$TAG" != "fallback-value" ]; then
+            echo "FAIL: expected tag 'fallback-value' but got '$TAG'"
             exit 1
           fi
-          echo "PASS: sha output is non-empty"
+          echo "PASS: tag output is the default fallback value"
 
-      - name: Note when action could not reach GitHub API
-        if: steps.describe.outcome == 'failure'
+      - name: Assert distance is zero when using default
+        env:
+          DISTANCE: ${{ steps.describe.outputs.distance }}
         run: |
-          echo "Action failed (GitHub API not accessible in this environment)"
-          echo "PASS: action failed gracefully without crashing the runner"
+          echo "distance: $DISTANCE"
+          if [ "$DISTANCE" != "0" ]; then
+            echo "FAIL: expected distance '0' but got '$DISTANCE'"
+            exit 1
+          fi
+          echo "PASS: distance is 0 when using default"
