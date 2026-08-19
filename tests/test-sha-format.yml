@@ -1,4 +1,4 @@
-name: Test basic usage
+name: Test sha output format
 on:
   workflow_dispatch:
 jobs:
@@ -28,48 +28,39 @@ jobs:
           token: ${{ github.token }}
           repo: actions/checkout
           commit-ish: main
-          default: "no-tag-found"
+          default: "no-tag"
 
-      - name: Assert sha output is populated
+      - name: Assert sha is a 40-character hex string
         env:
           SHA: ${{ steps.action.outputs.sha }}
         run: |
           echo "sha: $SHA"
-          if [ -z "$SHA" ]; then
-            echo "FAIL: expected sha to be non-empty"
+          if ! echo "$SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "FAIL: expected sha to be a 40-character hex string, got: '$SHA'"
             exit 1
           fi
-          echo "PASS: sha is populated"
+          echo "PASS: sha is a valid 40-character hex string"
 
-      - name: Assert short-sha output is populated
+      - name: Assert short-sha is a shorter hex string
         env:
           SHORT_SHA: ${{ steps.action.outputs.short-sha }}
         run: |
           echo "short-sha: $SHORT_SHA"
-          if [ -z "$SHORT_SHA" ]; then
-            echo "FAIL: expected short-sha to be non-empty"
+          if ! echo "$SHORT_SHA" | grep -qE '^[0-9a-f]{7,}$'; then
+            echo "FAIL: expected short-sha to be a hex string of at least 7 chars, got: '$SHORT_SHA'"
             exit 1
           fi
-          echo "PASS: short-sha is populated"
+          echo "PASS: short-sha is a valid hex string"
 
-      - name: Assert describe output is non-empty
+      - name: Assert sha starts with short-sha
         env:
-          DESCRIBE: ${{ steps.action.outputs.describe }}
+          SHA: ${{ steps.action.outputs.sha }}
+          SHORT_SHA: ${{ steps.action.outputs.short-sha }}
         run: |
-          echo "describe: $DESCRIBE"
-          if [ -z "$DESCRIBE" ]; then
-            echo "FAIL: expected describe to be non-empty"
+          echo "sha: $SHA"
+          echo "short-sha: $SHORT_SHA"
+          if ! echo "$SHA" | grep -q "^$SHORT_SHA"; then
+            echo "FAIL: expected sha to start with short-sha"
             exit 1
           fi
-          echo "PASS: describe is populated"
-
-      - name: Assert tag output is non-empty
-        env:
-          TAG: ${{ steps.action.outputs.tag }}
-        run: |
-          echo "tag: $TAG"
-          if [ -z "$TAG" ]; then
-            echo "FAIL: expected tag to be non-empty"
-            exit 1
-          fi
-          echo "PASS: tag is populated"
+          echo "PASS: sha starts with short-sha"

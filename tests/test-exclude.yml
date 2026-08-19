@@ -1,4 +1,4 @@
-name: Test default fallback when no tag matches
+name: Test exclude pattern
 on:
   workflow_dispatch:
 jobs:
@@ -28,16 +28,16 @@ jobs:
           token: ${{ github.token }}
           repo: actions/checkout
           commit-ish: main
-          match: "this-pattern-will-never-match-any-real-tag-xyzzy-*"
-          default: "fallback-value"
+          exclude: "*"
+          default: "excluded-fallback"
 
-      - name: Assert describe uses default when no tag matches
+      - name: Assert describe uses default when all tags are excluded
         env:
           DESCRIBE: ${{ steps.action.outputs.describe }}
         run: |
           echo "describe: $DESCRIBE"
-          if [ "$DESCRIBE" != "fallback-value" ]; then
-            echo "FAIL: expected describe to be 'fallback-value' but got '$DESCRIBE'"
+          if [ "$DESCRIBE" != "excluded-fallback" ]; then
+            echo "FAIL: expected describe to be 'excluded-fallback' but got '$DESCRIBE'"
             exit 1
           fi
-          echo "PASS: describe correctly uses default value"
+          echo "PASS: describe correctly uses default value when all tags excluded"
