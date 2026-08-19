@@ -1,0 +1,41 @@
+name: Test default fallback
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install gh CLI if not present
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "gh not found, installing..."
+            type -p curl >/dev/null || (apt-get update && apt-get install -y curl)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt-get update
+            apt-get install -y gh
+          else
+            echo "gh is already installed: $(gh --version)"
+          fi
+      - id: describe
+        uses: .
+        with:
+          token: ${{ github.token }}
+          repo: proudust/gh-describe
+          commit-ish: refs/tags/v2.0.0
+          match: "this-pattern-will-never-match-any-tag-xyzzy12345"
+          default: "fallback-value"
+      - name: Assert describe output uses default when no tag matches
+        env:
+          DESCRIBE: ${{ steps.describe.outputs.describe }}
+        run: |
+          echo "describe: $DESCRIBE"
+          if [ "$DESCRIBE" != "fallback-value" ]; then
+            echo "FAIL: expected 'fallback-value' but got '$DESCRIBE'"
+            exit 1
+          fi
+          echo "PASS"

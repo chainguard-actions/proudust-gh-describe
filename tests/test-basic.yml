@@ -1,0 +1,69 @@
+name: Test basic usage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install gh CLI if not present
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "gh not found, installing..."
+            type -p curl >/dev/null || (apt-get update && apt-get install -y curl)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt-get update
+            apt-get install -y gh
+          else
+            echo "gh is already installed: $(gh --version)"
+          fi
+      - id: describe
+        uses: .
+        with:
+          token: ${{ github.token }}
+          repo: proudust/gh-describe
+          commit-ish: refs/tags/v2.0.0
+      - name: Assert sha output is non-empty
+        env:
+          SHA: ${{ steps.describe.outputs.sha }}
+        run: |
+          echo "sha: $SHA"
+          if [ -z "$SHA" ]; then
+            echo "FAIL: sha output is empty"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert short-sha output is non-empty
+        env:
+          SHORT_SHA: ${{ steps.describe.outputs.short-sha }}
+        run: |
+          echo "short-sha: $SHORT_SHA"
+          if [ -z "$SHORT_SHA" ]; then
+            echo "FAIL: short-sha output is empty"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert tag output is non-empty
+        env:
+          TAG: ${{ steps.describe.outputs.tag }}
+        run: |
+          echo "tag: $TAG"
+          if [ -z "$TAG" ]; then
+            echo "FAIL: tag output is empty"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert describe output is non-empty
+        env:
+          DESCRIBE: ${{ steps.describe.outputs.describe }}
+        run: |
+          echo "describe: $DESCRIBE"
+          if [ -z "$DESCRIBE" ]; then
+            echo "FAIL: describe output is empty"
+            exit 1
+          fi
+          echo "PASS"
