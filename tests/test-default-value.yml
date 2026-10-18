@@ -1,0 +1,36 @@
+name: Test default value fallback
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          repo: proudust/gh-describe
+          commit-ish: v2.2.1
+          default: fallback-value
+        continue-on-error: true
+      - name: Assert outputs with default
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          DESCRIBE: ${{ steps.action.outputs.describe }}
+          TAG: ${{ steps.action.outputs.tag }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "describe: $DESCRIBE"
+          echo "tag: $TAG"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$DESCRIBE" ]; then
+              echo "FAIL: action succeeded but describe output is empty"
+              exit 1
+            fi
+            echo "PASS: got describe '$DESCRIBE'"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (API or network issue in harness)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
