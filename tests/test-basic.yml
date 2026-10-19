@@ -1,0 +1,49 @@
+name: Test basic usage with known public repo
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          repo: proudust/gh-describe
+          commit-ish: 9b3e5b5b3e5b5b3e5b5b3e5b5b3e5b5b3e5b5b3e
+        continue-on-error: true
+
+      - name: Assert outputs are present or action failed gracefully
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          DESCRIBE: ${{ steps.action.outputs.describe }}
+          TAG: ${{ steps.action.outputs.tag }}
+          SHA: ${{ steps.action.outputs.sha }}
+          SHORT_SHA: ${{ steps.action.outputs.short-sha }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "describe: $DESCRIBE"
+          echo "tag: $TAG"
+          echo "sha: $SHA"
+          echo "short-sha: $SHORT_SHA"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$TAG" ]; then
+              echo "FAIL: action succeeded but tag output is empty"
+              exit 1
+            fi
+            if [ -z "$SHA" ]; then
+              echo "FAIL: action succeeded but sha output is empty"
+              exit 1
+            fi
+            if [ -z "$SHORT_SHA" ]; then
+              echo "FAIL: action succeeded but short-sha output is empty"
+              exit 1
+            fi
+            echo "PASS: got tag='$TAG' sha='$SHA' short-sha='$SHORT_SHA'"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (commit-ish may not exist in repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

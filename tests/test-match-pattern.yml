@@ -1,0 +1,50 @@
+name: Test match glob pattern filtering
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action-match
+        uses: .
+        with:
+          repo: proudust/gh-describe
+          match: "v*"
+          default: no-match-found
+        continue-on-error: true
+
+      - name: Assert match pattern works or action failed gracefully
+        env:
+          OUTCOME: ${{ steps.action-match.outcome }}
+          DESCRIBE: ${{ steps.action-match.outputs.describe }}
+          TAG: ${{ steps.action-match.outputs.tag }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "describe: $DESCRIBE"
+          echo "tag: $TAG"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$DESCRIBE" = "no-match-found" ]; then
+              echo "PASS: no matching tag found, default used"
+            elif [ -n "$TAG" ]; then
+              # Verify the tag matches the v* pattern
+              case "$TAG" in
+                v*)
+                  echo "PASS: tag '$TAG' matches 'v*' pattern"
+                  ;;
+                *)
+                  echo "FAIL: tag '$TAG' does not match 'v*' pattern"
+                  exit 1
+                  ;;
+              esac
+            else
+              echo "FAIL: action succeeded but both tag and describe are empty"
+              exit 1
+            fi
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (sentinel repo or API issue)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

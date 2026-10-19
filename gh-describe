@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -e
+
+SCRIPT_DIR="$(
+    cd "$(dirname -- "$0")"
+    pwd
+)"
+
+function exec_by_deno() {
+    deno run -q --allow-run "${SCRIPT_DIR}"/cli/main.ts "$@"
+}
+
+function exec_by_node() {
+    node "${SCRIPT_DIR}"/dist/cli.js "$@"
+}
+
+POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case $1 in
+    --runtime)
+        RUNTIME="$2"
+        shift # past argument
+        shift # past value
+        ;;
+    *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift                   # past argument
+        ;;
+    esac
+done
+set -- "${POSITIONAL_ARGS[@]}"
+
+if [ "$RUNTIME" = "deno" ]; then
+    exec_by_deno "$@"
+elif [ "$RUNTIME" = "node" ]; then
+    exec_by_node "$@"
+elif type deno >/dev/null 2>&1; then
+    exec_by_deno "$@"
+elif type node >/dev/null 2>&1; then
+    exec_by_node "$@"
+else
+    echo "Error: deno is required to run gh-describe." >&2
+    exit 1
+fi

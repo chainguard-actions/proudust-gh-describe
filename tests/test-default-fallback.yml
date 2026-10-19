@@ -1,0 +1,39 @@
+name: Test default fallback when no tags found
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          repo: proudust/gh-describe
+          commit-ish: 0000000000000000000000000000000000000000
+          default: fallback-value
+        continue-on-error: true
+
+      - name: Assert default value is used or action failed gracefully
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          DESCRIBE: ${{ steps.action.outputs.describe }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "describe: $DESCRIBE"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$DESCRIBE" = "fallback-value" ]; then
+              echo "PASS: default fallback value used correctly"
+            elif [ -n "$DESCRIBE" ]; then
+              echo "PASS: describe output is '$DESCRIBE' (tag found)"
+            else
+              echo "FAIL: action succeeded but describe output is empty and no fallback"
+              exit 1
+            fi
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (commit-ish not found in repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

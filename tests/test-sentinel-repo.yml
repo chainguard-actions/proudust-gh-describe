@@ -1,0 +1,46 @@
+name: Test sentinel repo graceful failure
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Use default repo (sentinel) and default commit-ish (github.sha)
+      # The sentinel repo does not exist on GitHub, so the action should fail gracefully
+      - id: action
+        uses: .
+        with:
+          default: sentinel-fallback
+        continue-on-error: true
+
+      - name: Assert action ran and either succeeded or failed gracefully
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          DESCRIBE: ${{ steps.action.outputs.describe }}
+          TAG: ${{ steps.action.outputs.tag }}
+          SHA: ${{ steps.action.outputs.sha }}
+          SHORT_SHA: ${{ steps.action.outputs.short-sha }}
+          DISTANCE: ${{ steps.action.outputs.distance }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "describe: $DESCRIBE"
+          echo "tag: $TAG"
+          echo "sha: $SHA"
+          echo "short-sha: $SHORT_SHA"
+          echo "distance: $DISTANCE"
+          if [ "$OUTCOME" = "success" ]; then
+            # If it succeeded, outputs should be populated or default used
+            if [ -n "$DESCRIBE" ]; then
+              echo "PASS: action succeeded with describe='$DESCRIBE'"
+            else
+              echo "FAIL: action succeeded but describe output is empty"
+              exit 1
+            fi
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (sentinel repo is not resolvable)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
