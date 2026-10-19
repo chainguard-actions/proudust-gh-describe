@@ -14,6 +14,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | v2.1.2 | [`v2.1.2`](https://github.com/chainguard-actions/proudust-gh-describe/tree/v2.1.2) | [`d239881`](https://github.com/proudust/gh-describe/commit/d2398810d922ababf1ec0efb454e42953dfdc460) |
 | v2.2.0 | [`v2.2.0`](https://github.com/chainguard-actions/proudust-gh-describe/tree/v2.2.0) | [`80412be`](https://github.com/proudust/gh-describe/commit/80412be8ce0e77d8afba6b340e34790bc772aa45) |
 | v2.2.1 | [`v2.2.1`](https://github.com/chainguard-actions/proudust-gh-describe/tree/v2.2.1) | [`dd2f6c0`](https://github.com/proudust/gh-describe/commit/dd2f6c0686ced8bcf7513d29ff61a7802f8e2fd2) |
+| v2.2.2 | [`v2.2.2`](https://github.com/chainguard-actions/proudust-gh-describe/tree/v2.2.2) | [`9b42731`](https://github.com/proudust/gh-describe/commit/9b42731dd866e3cd8165a65f94cc58613def3114) |
 
 ## Privacy
 
